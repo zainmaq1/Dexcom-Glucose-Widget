@@ -1,4 +1,4 @@
-
+```kotlin
 package com.example.dexcomwidget
 
 import android.app.Notification
@@ -20,16 +20,13 @@ class G7NotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-
         Log.d(TAG, "LISTENER CONNECTED")
 
         try {
             val active = activeNotifications ?: emptyArray()
-
             Log.d(TAG, "Active notifications: ${active.size}")
 
             for (sbn in active) {
-                Log.d(TAG, "Active package: ${sbn.packageName}")
                 processNotification(sbn)
             }
         } catch (e: Exception) {
@@ -37,11 +34,15 @@ class G7NotificationListener : NotificationListenerService() {
         }
     }
 
+    override fun onNotificationPosted(sbn: StatusBarNotification) {
+        Log.d(TAG, "Notification posted from package: ${sbn.packageName}")
+        processNotification(sbn)
+    }
+
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         Log.w(TAG, "LISTENER DISCONNECTED")
 
-        // Ask Android to reconnect the listener when possible.
         requestRebind(
             android.content.ComponentName(
                 this,
@@ -50,19 +51,17 @@ class G7NotificationListener : NotificationListenerService() {
         )
     }
 
-    override fun onNotificationPosted(sbn: StatusBarNotification) {
-        Log.d(TAG, "Notification posted: ${sbn.packageName}")
-        processNotification(sbn)
-    }
-
     private fun processNotification(sbn: StatusBarNotification) {
         val packageName = sbn.packageName.lowercase(Locale.ROOT)
 
-        if (!packageName.contains("Dexcom G7")) {
+        // Package identifiers are not display names.
+        // Match the package identifier using "dexcom".
+        if (!packageName.contains("dexcom")) {
+            Log.d(TAG, "Ignoring non-Dexcom package: $packageName")
             return
         }
 
-        Log.d(TAG, "Dexcom notification detected: $packageName")
+        Log.d(TAG, "Dexcom package detected: $packageName")
 
         val extras = sbn.notification.extras
 
@@ -79,56 +78,38 @@ class G7NotificationListener : NotificationListenerService() {
             .filter { it.isNotBlank() }
             .joinToString(" ")
 
-        Log.d(TAG, "Notification text: $text")
+        // Diagnostic only: avoid logging unrelated notifications.
+        Log.d(TAG, "Dexcom notification text: $text")
 
         val value = GlucoseLogic.extractGlucose(text)
 
         if (value == null) {
-            Log.w(TAG, "No supported glucose reading found")
+            Log.w(TAG, "Dexcom notification received, but no supported reading was found")
             return
         }
 
-        Log.d(TAG, "Glucose extracted successfully")
+        Log.d(TAG, "Glucose extracted: ${GlucoseLogic.format(value)}")
 
         val prefs = getSharedPreferences(
             GlucoseLogic.PREFS,
             Context.MODE_PRIVATE
         )
 
-        val current = prefs.getString("current_raw", null)
-            ?.toFloatOrNull()
+        val current = prefs.getString("current_raw", null)?.toFloatOrNull()
+        val editor = prefs.edit()
 
-        if (current == null || current != value) {
-            val editor = prefs.edit()
-
-            if (current != null) {
-                editor.putString("last_raw", current.toString())
-                editor.putString(
-                    "last_display",
-                    GlucoseLogic.format(current)
-                )
-            } else {
-                editor.putString(
-                    "last_display",
-                    prefs.getString("last_display", "—")
-                )
-            }
-
-            editor.putString("current_raw", value.toString())
-            editor.putString(
-                "current_display",
-                GlucoseLogic.format(value)
-            )
-            editor.putString(
-                "updated_at",
-                SimpleDateFormat(
-                    "HH:mm",
-                    Locale.getDefault()
-                ).format(Date())
-            )
-
-            editor.apply()
+        if (current != null && current != value) {
+            editor.putString("last_raw", current.toString())
+            editor.putString("last_display", GlucoseLogic.format(current))
         }
+
+        editor.putString("current_raw", value.toString())
+        editor.putString("current_display", GlucoseLogic.format(value))
+        editor.putString(
+            "updated_at",
+            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        )
+        editor.apply()
 
         updateWidget()
     }
@@ -153,3 +134,4 @@ class G7NotificationListener : NotificationListenerService() {
         }
     }
 }
+```
