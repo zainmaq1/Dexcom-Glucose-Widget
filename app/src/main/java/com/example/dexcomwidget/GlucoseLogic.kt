@@ -6,8 +6,8 @@ object GlucoseLogic {
  const val PREFS = "glucose_widget_prefs"
  fun extractGlucose(input: String): Float? {
   val s = input.replace(',', '.')
-  Regex("""(?i)(\d{1,2}(?:\.\d{1,2})?)\s*mmol\s*/?\s*l""").find(s)?.groupValues?.get(1)?.toFloatOrNull()?.let { return it }
-  Regex("""(?i)(\d{2,3}(?:\.\d{1,2})?)\s*mg\s*/?\s*dl""").find(s)?.groupValues?.get(1)?.toFloatOrNull()?.let { return it / 18.0182f }
+  Regex("""(?i)(\d{1,2}(?:\.\d{1,2})?)(?:\s*[↑↗→↘↓↙⬆⬇⇧⇩]\s*)?\s*mmol\s*/?\s*l""").find(s)?.groupValues?.get(1)?.toFloatOrNull()?.let { return it }
+  Regex("""(?i)(\d{1,2}(?:\.\d{1,2})?)(?:\s*[↑↗→↘↓↙⬆⬇⇧⇩]\s*)?\s*mmol\s*/?\s*l""").find(s)?.groupValues?.get(1)?.toFloatOrNull()?.let { return it / 18.0182f }
   return null // Do not guess units if notification only shows a bare number.
  }
  fun format(v: Float) = String.format(Locale.getDefault(), "%.1f", v)
